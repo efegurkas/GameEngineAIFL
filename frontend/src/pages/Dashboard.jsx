@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import Board from '../components/Board'
-import { Copy, Check, Eye, EyeOff, Zap, Activity, Shield, Play, RefreshCw, Cpu, Key, Upload, FileCode, CheckCircle, AlertCircle, X, ChevronRight } from 'lucide-react'
+import { Copy, Check, Eye, EyeOff, Zap, Activity, Shield, Play, RefreshCw, Cpu, Key, Upload, FileCode, CheckCircle, AlertCircle, X, ChevronRight, Swords, Users } from 'lucide-react'
 
 const emptyBoard = Array(15).fill(null).map(() => Array(15).fill(0))
 
@@ -286,6 +286,144 @@ function BotCodeUpload() {
   )
 }
 
+// ── Friendly Match Card ──────────────────────────────────────────────────────
+function FriendlyMatch({ currentTeam, socket }) {
+  const [teams, setTeams]           = useState([])
+  const [loading, setLoading]       = useState(true)
+  const [challenging, setChallenging] = useState(null) // teamName being challenged
+  const [result, setResult]         = useState(null)   // { type, message }
+
+  useEffect(() => {
+    fetch('/api/teams/', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : [])
+      .then(d => {
+        // Kendi takımımızı listeden çıkar
+        const others = Array.isArray(d) ? d.filter(t => t.teamName !== currentTeam) : []
+        setTeams(others)
+      })
+      .catch(() => setTeams([]))
+      .finally(() => setLoading(false))
+  }, [currentTeam])
+
+  const sendChallenge = async (opponentName) => {
+    setChallenging(opponentName)
+    setResult(null)
+    try {
+      const res = await fetch('/api/match/start', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ team1: currentTeam, team2: opponentName }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setResult({ type: 'success', message: `${opponentName} ile maç başladı!` })
+      } else {
+        setResult({ type: 'error', message: data.message || 'Maç başlatılamadı' })
+      }
+    } catch {
+      setResult({ type: 'error', message: 'Sunucuya bağlanılamadı' })
+    } finally {
+      setChallenging(null)
+    }
+  }
+
+  const accent = '#a78bfa'
+
+  return (
+    <div style={{ background: '#0c0f14', border: '1px solid #1a2030', borderRadius: 8, padding: 24 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+        <div style={{ width: 3, height: 18, borderRadius: 2, background: accent, boxShadow: `0 0 8px ${accent}` }} />
+        <span style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 13, color: accent, letterSpacing: '0.2em' }}>DOSTLUK MAÇI</span>
+        <Swords size={13} color={accent + '66'} style={{ marginLeft: 2 }} />
+      </div>
+
+      {/* Result banner */}
+      {result && (
+        <div className="slide-up" style={{
+          display: 'flex', alignItems: 'center', gap: 7, marginBottom: 14,
+          padding: '8px 12px', borderRadius: 5,
+          background: result.type === 'error' ? 'rgba(255,51,85,.06)' : 'rgba(0,255,136,.06)',
+          border: `1px solid ${result.type === 'error' ? 'rgba(255,51,85,.2)' : 'rgba(0,255,136,.2)'}`,
+        }}>
+          {result.type === 'error'
+            ? <AlertCircle size={12} color="#ff3355" />
+            : <CheckCircle size={12} color="#00ff88" />}
+          <span style={{
+            fontFamily: 'JetBrains Mono, monospace', fontSize: 10,
+            color: result.type === 'error' ? '#ff3355' : '#00ff88',
+          }}>{result.message}</span>
+        </div>
+      )}
+
+      {/* Team list */}
+      {loading ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, gap: 8 }}>
+          <div style={{ width: 14, height: 14, border: '1.5px solid rgba(167,139,250,.2)', borderTopColor: accent, borderRadius: '50%', animation: 'spinFull .7s linear infinite' }} />
+          <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: '#6080a0' }}>Takımlar yükleniyor...</span>
+        </div>
+      ) : teams.length === 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 120, gap: 8 }}>
+          <Users size={24} color="rgba(167,139,250,.2)" />
+          <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: '#6080a0', opacity: .5 }}>
+            Henüz başka takım yok
+          </span>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 260, overflowY: 'auto' }}>
+          {teams.map((t, i) => (
+            <div key={t.teamName} style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '10px 14px', borderRadius: 6,
+              background: '#070a0e', border: '1px solid #1a2030',
+              opacity: 0, animation: `fadeIn .3s ease ${i * 40}ms forwards`,
+            }}>
+              {/* Team info */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 6, flexShrink: 0,
+                  background: 'rgba(167,139,250,.08)', border: '1px solid rgba(167,139,250,.15)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: 'Rajdhani, sans-serif', fontSize: 13, fontWeight: 700, color: accent,
+                }}>
+                  {t.teamName?.[0]?.toUpperCase() ?? '?'}
+                </div>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: '#e2e8f0' }}>
+                  {t.teamName}
+                </span>
+              </div>
+
+              {/* Challenge button */}
+              <button
+                onClick={() => sendChallenge(t.teamName)}
+                disabled={!!challenging}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px',
+                  fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: '0.1em',
+                  background: challenging === t.teamName ? 'rgba(167,139,250,.05)' : 'rgba(167,139,250,.08)',
+                  border: `1px solid ${challenging === t.teamName ? 'rgba(167,139,250,.1)' : 'rgba(167,139,250,.25)'}`,
+                  borderRadius: 4, color: challenging === t.teamName ? accent + '55' : accent,
+                  cursor: challenging ? 'not-allowed' : 'pointer', transition: 'all .2s ease',
+                }}
+                onMouseEnter={e => { if (!challenging) e.currentTarget.style.background = 'rgba(167,139,250,.16)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(167,139,250,.08)' }}
+              >
+                {challenging === t.teamName ? (
+                  <div style={{ width: 10, height: 10, border: '1.5px solid rgba(167,139,250,.2)', borderTopColor: accent, borderRadius: '50%', animation: 'spinFull .7s linear infinite' }} />
+                ) : (
+                  <Swords size={10} />
+                )}
+                MEYDAN OKU
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main Dashboard ───────────────────────────────────────────────────────────
 export default function Dashboard({ socket }) {
   const { auth } = useAuth()
@@ -446,66 +584,8 @@ export default function Dashboard({ socket }) {
           </div>
         </div>
 
-        {/* Test Arena */}
-        <div style={{ background: '#0c0f14', border: '1px solid #1a2030', borderRadius: 8, padding: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 3, height: 18, borderRadius: 2, background: '#00ff88', boxShadow: '0 0 8px #00ff88' }} />
-              <span style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 13, color: '#00ff88', letterSpacing: '0.2em' }}>TEST ARENASI</span>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {testGame.gameId && (
-                <button onClick={startTestGame} style={{
-                  display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px',
-                  fontFamily: 'JetBrains Mono, monospace', fontSize: 10,
-                  background: '#141820', border: '1px solid #1e2838', borderRadius: 4, color: '#6080a0', cursor: 'pointer',
-                }}>
-                  <RefreshCw size={10} /> SIFIRLA
-                </button>
-              )}
-              <button onClick={startTestGame} style={{
-                display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px',
-                fontFamily: 'JetBrains Mono, monospace', fontSize: 10,
-                background: 'rgba(0,255,136,.08)', border: '1px solid rgba(0,255,136,.22)', borderRadius: 4, color: '#00ff88', cursor: 'pointer',
-                transition: 'all .2s ease',
-              }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,255,136,.15)' }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,255,136,.08)' }}>
-                <Play size={10} /> {testGame.gameId ? 'YENİ OYUN' : 'BAŞLAT'}
-              </button>
-            </div>
-          </div>
-
-          {!testGame.gameId ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, gap: 12 }}>
-              <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(0,255,136,.06)', border: '1px solid rgba(0,255,136,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Play size={20} color="rgba(0,255,136,.4)" />
-              </div>
-              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, opacity: .25 }}>
-                BAŞLAT butonuna tıklayın
-              </span>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', gap: 16 }}>
-              <div style={{ flexShrink: 0, transform: 'scale(0.60)', transformOrigin: 'top left', marginBottom: -216 }}>
-                <Board board={testGame.board} lastMove={lastMove} onCellClick={handleBoardClick} interactive={!testGame.isGameOver} />
-              </div>
-              <div style={{ flex: 1, minWidth: 0, maxHeight: 326, overflowY: 'auto' }}>
-                {testGame.isGameOver && (
-                  <div className="slide-up" style={{ padding: '8px 12px', marginBottom: 8, borderRadius: 5, background: 'rgba(255,170,0,.08)', border: '1px solid rgba(255,170,0,.2)', fontFamily: 'Rajdhani, sans-serif', fontSize: 14, color: '#ffaa00', textAlign: 'center' }}>
-                    {testGame.winner === 'DRAW' ? '🤝 Beraberlik' : `🏆 ${testGame.winner === 1 ? 'Siyah' : 'Beyaz'} Kazandı`}
-                  </div>
-                )}
-                {testLog.slice(-16).map((l, i) => (
-                  <div key={i} className="log-entry" style={{ display: 'flex', gap: 8, padding: '3px 0', fontFamily: 'JetBrains Mono, monospace', fontSize: 10 }}>
-                    <span style={{ color: '#6080a0', opacity: .5, flexShrink: 0 }}>{l.time}</span>
-                    <span style={{ color: logColor[l.type] || '#e2e8f0' }}>{l.message}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Dostluk Maçı */}
+        <FriendlyMatch currentTeam={team?.teamName} socket={socket} />
       </div>
 
       {/* Row 2: Bot Code Upload (full width) */}

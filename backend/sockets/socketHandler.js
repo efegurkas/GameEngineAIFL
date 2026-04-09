@@ -2,12 +2,11 @@ const Team         = require('../models/Team');
 const GomokuEngine = require('../engine/gomokuEngine');
 
 const activeBots   = new Map();
-const activeMatches = new Map();   // ← dışa açık, matchSimulator ve matchRoute bunu kullanır
+const activeMatches = new Map();   
 const waitingQueue  = [];
 
 module.exports = (io) => {
 
-  // match route'una inject et
   try {
     const matchRoute = require('../routes/match');
     matchRoute.init(io, activeMatches);
